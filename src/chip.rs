@@ -70,14 +70,18 @@ impl Chip8 {
             self.memory[0x200 + i] = buffer[i];
         }
     }
+
+    pub fn draw_test(&mut self) {
+        self.display[0] = 0x020;
+    }
 }
 #[allow(dead_code)]
 impl Instructions for Chip8 {
     fn memory(&self) -> [u8; 4096] {
         self.memory
     }
-    fn display(&self) -> [u32; 64 * 32] {
-        self.display
+    fn display(&self) -> &[u32; 64 * 32] {
+        &self.display
     }
     fn program_counter(&self) -> u16 {
         self.program_counter
@@ -96,5 +100,10 @@ impl Instructions for Chip8 {
     }
     fn variable_registers(&self) -> [u8; 16] {
         self.variable_registers
+    }
+
+    fn ins_00E0(&mut self) {
+        let screen_size = self.display.len();
+        self.display[0..screen_size].copy_from_slice(&vec![0x000; screen_size]);
     }
 }
