@@ -1,16 +1,17 @@
 use std::collections::LinkedList;
-
-struct Chip8 {
-    memory: [u8; 4096],
-    display: [u32; 64 * 32],
-    program_counter: u16,
-    index_register: u16,
-    stack: LinkedList<u16>,
-    delay_timer: u8,
-    sound_timer: u8,
-    variable_registers: [u8; 16],
-}
+mod chip;
+use chip::Chip8;
 
 fn main() {
-    println!();
+    let cycles = 8;
+    let filename = "IBMLogo.ch8".to_string();
+    let mut chip = Chip8::new(cycles);
+    chip.load_rom(filename);
+
+    for i in 0..100 {
+        print!("{:#05x} ", chip.memory[0x200 + i]);
+        if (i + 1) % 5 == 0 {
+            println!()
+        };
+    }
 }
