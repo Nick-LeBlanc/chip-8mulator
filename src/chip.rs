@@ -1,17 +1,19 @@
+use crate::instructions::Instructions;
+use std::borrow::Borrow;
 use std::collections::LinkedList;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
 pub struct Chip8 {
-    pub memory: [u8; 4096],
-    pub display: [u32; 64 * 32],
-    pub program_counter: u16,
-    pub index_register: u16,
-    pub stack: LinkedList<u16>,
-    pub delay_timer: u8,
-    pub sound_timer: u8,
-    pub variable_registers: [u8; 16],
+    memory: [u8; 4096],
+    display: [u32; 64 * 32],
+    program_counter: u16,
+    index_register: u16,
+    stack: LinkedList<u16>,
+    delay_timer: u8,
+    sound_timer: u8,
+    variable_registers: [u8; 16],
 }
 
 impl Chip8 {
@@ -67,5 +69,32 @@ impl Chip8 {
         for i in 0..buffer.len() {
             self.memory[0x200 + i] = buffer[i];
         }
+    }
+}
+#[allow(dead_code)]
+impl Instructions for Chip8 {
+    fn memory(&self) -> [u8; 4096] {
+        self.memory
+    }
+    fn display(&self) -> [u32; 64 * 32] {
+        self.display
+    }
+    fn program_counter(&self) -> u16 {
+        self.program_counter
+    }
+    fn index_register(&self) -> u16 {
+        self.index_register
+    }
+    fn stack(&self) -> &LinkedList<u16> {
+        &self.stack
+    }
+    fn delay_timer(&self) -> u8 {
+        self.delay_timer
+    }
+    fn sound_timer(&self) -> u8 {
+        self.sound_timer
+    }
+    fn variable_registers(&self) -> [u8; 16] {
+        self.variable_registers
     }
 }
