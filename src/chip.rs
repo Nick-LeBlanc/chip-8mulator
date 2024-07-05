@@ -5,28 +5,32 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
+const V_WIDTH: u32 = 64;
+const V_HEIGHT:u32 = 32;
 pub struct Chip8 {
     memory: [u8; 4096],
-    display: [u32; 64 * 32],
+    display: [u32; (V_WIDTH * V_HEIGHT) as usize],
     program_counter: u16,
     index_register: u16,
     stack: LinkedList<u16>,
     delay_timer: u8,
     sound_timer: u8,
     variable_registers: [u8; 16],
+    opcode: u16
 }
 
 impl Chip8 {
     pub fn new(cycles: u16) -> Self {
         let mut init_chip = Chip8 {
-            memory: [0x00; 4096],
-            display: [0x00; 64 * 32],
+            memory: [0x000; 4096],
+            display: [0x000; (V_WIDTH * V_HEIGHT) as usize],
             program_counter: 0x200,
-            index_register: 0x00,
+            index_register: 0x000,
             stack: LinkedList::new(),
-            delay_timer: 0x00,
-            sound_timer: 0x00,
-            variable_registers: [0x00; 16],
+            delay_timer: 0x000,
+            sound_timer: 0x000,
+            variable_registers: [0x000; 16],
+            opcode: 0x000
         };
         init_chip.load_font();
         return init_chip;
@@ -52,7 +56,6 @@ impl Chip8 {
         ];
         self.memory[0x050..=0x09F].copy_from_slice(&font);
     }
-
     pub fn load_rom(&mut self, filename: String) {
         let rom: File =
             File::open(&filename).expect(format!("Could not open file: {filename}\n").as_str());
@@ -71,39 +74,75 @@ impl Chip8 {
         }
     }
 
-    pub fn draw_test(&mut self) {
-        self.display[0] = 0x020;
+    pub fn cycle(&mut self){
+        self.opcode = self.fetch();
+
+        self.decode();
+
+        if self.delay_timer > 0 { self.delay_timer = self.delay_timer -1; }
+        if self.sound_timer > 0 { self.sound_timer = self.sound_timer -1; }
+    }
+
+   fn fetch(&mut self) -> u16{
+        let left =  (self.memory[self.program_counter as usize]) as u16;
+        let right  = (self.memory[(self.program_counter +1)as usize]) as u16;
+        self.program_counter = self.program_counter + 2;
+        left << 8u8 | right
+    }
+
+
+    fn decode(&mut self){
+
     }
 }
 #[allow(dead_code)]
 impl Instructions for Chip8 {
-    fn memory(&self) -> [u8; 4096] {
-        self.memory
-    }
-    fn display(&self) -> &[u32; 64 * 32] {
-        &self.display
-    }
-    fn program_counter(&self) -> u16 {
-        self.program_counter
-    }
-    fn index_register(&self) -> u16 {
-        self.index_register
-    }
-    fn stack(&self) -> &LinkedList<u16> {
-        &self.stack
-    }
-    fn delay_timer(&self) -> u8 {
-        self.delay_timer
-    }
-    fn sound_timer(&self) -> u8 {
-        self.sound_timer
-    }
-    fn variable_registers(&self) -> [u8; 16] {
-        self.variable_registers
-    }
+
 
     fn ins_00E0(&mut self) {
         let screen_size = self.display.len();
         self.display[0..screen_size].copy_from_slice(&vec![0x000; screen_size]);
+    }
+    fn ins_1NNN(&mut self) {
+        self.program_counter = self.opcode & 0xFFF;
+    }
+    fn ins_6XNN(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8;
+        let byte = (self.opcode & 0x00FF) as u8;
+        self.variable_registers[vx as usize] = byte;
+    }
+
+    fn ins_7XNN(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8;
+        let byte = (self.opcode & 0x00FF) as u8;
+        self.variable_registers[vx as usize] = self.variable_registers[vx as usize] + byte;
+    }
+
+    fn ins_ANNN(&mut self) {
+        self.index_register = self.opcode & 0x0FFF
+    }
+
+    fn ins_DXYN(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8;
+        let vy = (self.opcode & 0x0F00) >> 4;
+        let height = self.opcode & 0x000F;
+        let xPos = self.variable_registers[vx as usize] % V_WIDTH as u8;
+        let yPos = self.variable_registers[vy as usize] % V_HEIGHT as u8;
+        self.variable_registers[0xF] = 0;
+
+        for row in 0..height{
+            let sprite = self.memory[(self.index_register + row) as usize];
+            for col in 0..8{
+                let pixel = sprite & (0x80 >> col);
+                let mut screen_pixel = self.display[((yPos+row as u8) * V_WIDTH as u8 + (xPos +col)) as usize];
+
+                if pixel != 0 {
+                    if screen_pixel == 0xFFFFFFFF{
+                        self.variable_registers[0xFusize] = 1;
+                    }
+                    screen_pixel ^= 0xFFFFFFFF;
+                }
+            }
+        }
     }
 }
