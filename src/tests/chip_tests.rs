@@ -7,21 +7,21 @@ mod tests {
     #[test]
     fn ins_00e0_test() {
         let mut chip = Chip8::new(8);
-        chip.ins_00E0();
+        chip.ins_00e0();
         assert_eq!(&[0x000u32; 64 * 32], chip.display());
     }
 
     #[test]
     fn ins_1nnn_test() {
         let mut chip = Chip8::new(8);
-        chip.ins_1NNN();
+        chip.ins_1nnn();
         assert_eq!(chip.opcode(),chip.program_counter());
     }
 
     #[test]
     fn cycle_test(){
         let mut chip = Chip8::new(8);
-        chip.load_rom("IBMLogo.ch8".to_string());
+        chip.load_rom("roms/test_opcode.ch8".to_string());
         assert_ne!(0x000,chip.memory()[0x200+1]);
         for i in 0..100{
             chip.cycle();
@@ -44,12 +44,10 @@ mod tests {
 
     #[test]
     fn bit_test(){
-        let ins:u16 = 0xd5Ef;
-        //Drawing row: 23, column: 52
-        print!("{:#04x} ", (ins & 0x0F00) >> 8u8);
-        print!("{:#04x} ", (ins & 0x00F0) >> 4u8 );
-        print!("{} ", 0x80 );
-        assert!(true)
+        let ins:u16 = 0x2200;
+        let new_ins = ins & 0x0FFF;
+        //print!("{:#04x} ", (ins & 0x0FFF) >> 8u8);
+        assert_eq!(0x200, new_ins)
     }
 
 }

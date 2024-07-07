@@ -87,8 +87,8 @@ impl Chip8 {
     }
 
     pub fn draw_test(&mut self) {
-        self.ins_00E0();
-        self.ins_DXYN();
+        self.ins_00e0();
+        self.ins_dxyn();
     }
 
     pub fn cycle(&mut self){
@@ -107,46 +107,46 @@ impl Chip8 {
         let ins = self.opcode & 0xF000;
         let data = self.opcode & 0x0FFF;
         match ins {
-            0x0000 => self.ins_00E0(),
-            0x1000 => self.ins_1NNN(),
-            0xA000 => self.ins_ANNN(),
-            0x6000 => self.ins_6XNN(),
-            0x7000 => self.ins_7XNN(),
-            0xD000 => self.ins_DXYN(),
-            _ => self.ins_NULL(),
+            0x0000 => self.ins_00e0(),
+            0x1000 => self.ins_1nnn(),
+            0xA000 => self.ins_annn(),
+            0x6000 => self.ins_6xnn(),
+            0x7000 => self.ins_7xnn(),
+            0xD000 => self.ins_dxyn(),
+             _ => self.ins_null(),
         }
     }
 }
 #[allow(dead_code)]
 impl Instructions for Chip8 {
-    fn ins_NULL(&mut self) {
+    fn ins_null(&mut self) {
         return
     }
-    fn ins_00E0(&mut self) {
+    fn ins_00e0(&mut self) {
         let screen_size = self.display.len();
         self.display[0..screen_size].copy_from_slice(&vec![0x000u32; screen_size]);
     }
 
-    fn ins_1NNN(&mut self) {
+    fn ins_1nnn(&mut self) {
         self.program_counter = self.opcode & 0x0FFF;
     }
 
-    fn ins_6XNN(&mut self) {
+    fn ins_6xnn(&mut self) {
         let vx:u16 = (self.opcode & 0x0F00) >> 8u8;
         let data:u8 = (self.opcode & 0x0FF) as u8;
         self.variable_registers[vx as usize] = data;
     }
-    fn ins_7XNN(&mut self) {
+    fn ins_7xnn(&mut self) {
         let vx:u16 = (self.opcode & 0x0F00) >> 8u8;
-        let data:u8 = (self.opcode & 0x0FF) as u8;
-        self.variable_registers[vx as usize] = self.variable_registers[vx as usize] + data;
+        let data:u16 = (self.opcode & 0x00FF);
+        self.variable_registers[vx as usize] = (self.variable_registers[vx as usize] as u16 + data) as u8;
 
     }
-    fn ins_ANNN(&mut self) {
+    fn ins_annn(&mut self) {
         self.index_register = self.opcode & 0x0FFF;
     }
 
-    fn ins_DXYN(&mut self){
+    fn ins_dxyn(&mut self){
         self.variable_registers[0xF] = 0;
         let vx:u8 = ((self.opcode & 0x0F00) >> 8u8) as u8;
         let vy:u8 = ((self.opcode & 0x00F0) >> 4u8) as u8;
@@ -157,7 +157,7 @@ impl Instructions for Chip8 {
         let height = self.opcode & 0x000F;
 
         for row in 0..height {
-            let sprite_data = self.memory[(self.index_register+row as u16) as usize];
+            let sprite_data = self.memory[(self.index_register+row) as usize];
             for col in 0..8u16{
                 let pixel_data = sprite_data & (0x80 >> col);
                 if pixel_data != 0{
@@ -171,4 +171,89 @@ impl Instructions for Chip8 {
         }
 
     }
+
+    fn ins_2nnn(&mut self) {
+        let mem_loc = self.opcode & 0x0FFF;
+        self.program_counter = mem_loc;
+        self.stack.push_front(mem_loc);
+    }
+
+    fn ins_00ee(&mut self) {
+        self.program_counter = self.stack.pop_front().unwrap();
+    }
+
+    fn ins_3xnn(&mut self) {}
+
+    fn ins_4xnn(&mut self) {}
+
+    fn ins_5xy0(&mut self) {}
+
+    fn ins_9xy0(&mut self) {}
+
+
+    fn ins_8xy0(&mut self) {}
+
+
+    fn ins_8xy1(&mut self) {}
+
+
+    fn ins_8xy2(&mut self) {}
+
+
+    fn ins_8xy3(&mut self) {}
+
+
+    fn ins_8xy4(&mut self) {}
+
+
+    fn ins_8xy5(&mut self) {}
+
+
+    fn ins_8xye(&mut self) {}
+
+
+    fn ins_8xy6(&mut self) {}
+
+
+    fn ins_8xy7(&mut self) {}
+
+
+    fn ins_bnnn(&mut self) {}
+
+
+    fn ins_cxnn(&mut self) {}
+
+
+    fn ins_ex9e(&mut self) {}
+
+
+    fn ins_exa1(&mut self) {}
+
+
+    fn ins_fx07(&mut self) {}
+
+
+    fn ins_fx15(&mut self) {}
+
+
+    fn ins_fx18(&mut self) {}
+
+
+    fn ins_fx1e(&mut self) {}
+
+
+    fn ins_fx0a(&mut self) {}
+
+
+    fn ins_fx29(&mut self) {}
+
+
+    fn ins_fx33(&mut self) {}
+
+
+    fn ins_fx55(&mut self) {}
+
+
+    fn ins_fx65(&mut self) {}
+
 }
