@@ -8,7 +8,7 @@ use minifb::{Key, Scale, ScaleMode, Window, WindowOptions};
 
 fn main() {
     let cycles = 8;
-    let filename = "IBMLogo.ch8".to_string();
+    let filename = "roms/IBMLogo.ch8".to_string();
     let mut chip = Chip8::new(cycles);
     chip.load_rom(filename);
 

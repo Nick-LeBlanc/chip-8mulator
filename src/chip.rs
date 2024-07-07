@@ -115,15 +115,6 @@ impl Chip8 {
             0xD000 => self.ins_DXYN(),
             _ => self.ins_NULL(),
         }
-
-        // table[0x0] = &Chip8::Table0;
-        // table[0x1] = &Chip8::OP_1nnn;
-        // table0[0xE] = &Chip8::OP_00EE;
-        // table[0x6] = &Chip8::OP_6xkk;
-        // table[0x7] = &Chip8::OP_7xkk;
-        // table[0xA] = &Chip8::OP_Annn;
-        //
-        // table[0xD] = &Chip8::OP_Dxyn;
     }
 }
 #[allow(dead_code)]
