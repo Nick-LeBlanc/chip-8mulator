@@ -1,17 +1,21 @@
+use std::char::decode_utf16;
 use crate::instructions::Instructions;
-use std::collections::LinkedList;
+use std::env::var;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::num::Wrapping;
+use rand::prelude::*;
 
 pub struct Chip8 {
     memory: [u8; 4096],
     display: [u32; 64 * 32],
     program_counter: u16,
     index_register: u16,
-    stack: LinkedList<u16>,
+    stack: Vec<u16>,
     delay_timer: u8,
     sound_timer: u8,
+    keypad: [u8;16],
     variable_registers: [u8; 16],
     opcode:u16
 }
@@ -23,9 +27,10 @@ impl Chip8 {
             display: [0x000u32; 64 * 32],
             program_counter: 0x200,
             index_register: 0x0,
-            stack: LinkedList::new(),
+            stack: Vec::with_capacity(16),
             delay_timer: 0x000,
             sound_timer: 0x000,
+            keypad:[0x000; 16],
             variable_registers: [0x000; 16],
             opcode: 0x000,
         };
@@ -86,11 +91,6 @@ impl Chip8 {
         }
     }
 
-    pub fn draw_test(&mut self) {
-        self.ins_00e0();
-        self.ins_dxyn();
-    }
-
     pub fn cycle(&mut self){
         self.opcode = (self.memory[self.program_counter as usize] as u16) << 8
             | (self.memory[(self.program_counter +1) as usize] as u16);
@@ -105,14 +105,65 @@ impl Chip8 {
 
     fn decode(&mut self){
         let ins = self.opcode & 0xF000;
-        let data = self.opcode & 0x0FFF;
         match ins {
-            0x0000 => self.ins_00e0(),
+            0x0000 => {
+                let last_bit = self.opcode & 0x000F;
+                match last_bit{
+                    0x0 => self.ins_00e0(),
+                    0xE => self.ins_00ee(),
+                    _   => self.ins_null()
+                }
+            },
             0x1000 => self.ins_1nnn(),
-            0xA000 => self.ins_annn(),
+            0x2000 => self.ins_2nnn(),
+            0x3000 => self.ins_3xnn(),
+            0x4000 => self.ins_4xnn(),
+            0x5000 => self.ins_5xy0(),
             0x6000 => self.ins_6xnn(),
             0x7000 => self.ins_7xnn(),
+            0x8000 => {
+                let last_bit = self.opcode & 0x000F;
+                match last_bit{
+                    0x0 => self.ins_8xy0(),
+                    0x1 => self.ins_8xy1(),
+                    0x2 => self.ins_8xy2(),
+                    0x3 => self.ins_8xy3(),
+                    0x4 => self.ins_8xy4(),
+                    0x5 => self.ins_8xy5(),
+                    0x6 => self.ins_8xy6(),
+                    0x7 => self.ins_8xy7(),
+                    0xE => self.ins_8xye(),
+                    _   => self.ins_null()
+                }
+            },
+            0x9000 => self.ins_9xy0(),
+            0xA000 => self.ins_annn(),
+            0xB000 => self.ins_bnnn(),
+            0xC000 => self.ins_cxnn(),
             0xD000 => self.ins_dxyn(),
+            0xE000 => {
+                let last_bit = self.opcode & 0x00FF;
+                match last_bit{
+                    0xa1 => self.ins_exa1(),
+                    0x9e => self.ins_ex9e(),
+                    _   => self.ins_null()
+                }
+            },
+            0xF000 => {
+                let last_bit = self.opcode & 0x00FF;
+                match last_bit{
+                    0x07 => self.ins_fx07(),
+                    0x0A => self.ins_fx0a(),
+                    0x15 => self.ins_fx18(),
+                    0x18 => self.ins_fx18(),
+                    0x1E => self.ins_fx1e(),
+                    0x29 => self.ins_fx29(),
+                    0x33 => self.ins_fx33(),
+                    0x55 => self.ins_fx55(),
+                    0x65 => self.ins_fx65(),
+                    _   => self.ins_null()
+                }
+            },
              _ => self.ins_null(),
         }
     }
@@ -138,7 +189,7 @@ impl Instructions for Chip8 {
     }
     fn ins_7xnn(&mut self) {
         let vx:u16 = (self.opcode & 0x0F00) >> 8u8;
-        let data:u16 = (self.opcode & 0x00FF);
+        let data:u16 = self.opcode & 0x00FF;
         self.variable_registers[vx as usize] = (self.variable_registers[vx as usize] as u16 + data) as u8;
 
     }
@@ -174,39 +225,97 @@ impl Instructions for Chip8 {
 
     fn ins_2nnn(&mut self) {
         let mem_loc = self.opcode & 0x0FFF;
+        self.stack.push(self.program_counter);
         self.program_counter = mem_loc;
-        self.stack.push_front(mem_loc);
     }
 
     fn ins_00ee(&mut self) {
-        self.program_counter = self.stack.pop_front().unwrap();
+        self.program_counter = self.stack.pop().unwrap();
     }
 
-    fn ins_3xnn(&mut self) {}
+    fn ins_3xnn(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let data:u8 = (self.opcode & 0x00FF) as u8;
+        if self.variable_registers[vx as usize] == data {
+            self.program_counter = self.program_counter + 2;
+        }
+    }
 
-    fn ins_4xnn(&mut self) {}
+    fn ins_4xnn(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let data:u8 = (self.opcode & 0x00FF) as u8;
+        if self.variable_registers[vx as usize] != data {
+            self.program_counter = self.program_counter + 2;
+        }
+    }
 
-    fn ins_5xy0(&mut self) {}
+    fn ins_5xy0(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        if self.variable_registers[vx as usize] == self.variable_registers[vy as usize] {
+            self.program_counter = self.program_counter + 2;
+        }
+    }
 
-    fn ins_9xy0(&mut self) {}
-
-
-    fn ins_8xy0(&mut self) {}
-
-
-    fn ins_8xy1(&mut self) {}
-
-
-    fn ins_8xy2(&mut self) {}
-
-
-    fn ins_8xy3(&mut self) {}
-
-
-    fn ins_8xy4(&mut self) {}
+    fn ins_9xy0(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        if self.variable_registers[vx as usize] != self.variable_registers[vy as usize] {
+            self.program_counter = self.program_counter + 2;
+        }
+    }
 
 
-    fn ins_8xy5(&mut self) {}
+    fn ins_8xy0(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        self.variable_registers[vx as usize] = self.variable_registers[vy as usize]
+    }
+
+
+    fn ins_8xy1(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        self.variable_registers[vx as usize] = self.variable_registers[vx as usize] | self.variable_registers[vy as usize]
+    }
+
+
+    fn ins_8xy2(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        self.variable_registers[vx as usize] = self.variable_registers[vx as usize] & self.variable_registers[vy as usize]
+    }
+
+
+    fn ins_8xy3(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        self.variable_registers[vx as usize] = self.variable_registers[vx as usize] ^ self.variable_registers[vy as usize]
+    }
+
+
+    fn ins_8xy4(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        let x_pos:u16 = self.variable_registers[vx as usize] as u16;
+        let y_pos:u16 = self.variable_registers[vy as usize] as u16;
+        self.variable_registers[0xF] = if (x_pos + y_pos) > 255 {1} else {0};
+        self.variable_registers[vx as usize] = Wrapping(x_pos + y_pos).0 as u8;
+    }
+
+
+    fn ins_8xy5(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        let x_pos = Wrapping(self.variable_registers[vx as usize]);
+        let y_pos = Wrapping(self.variable_registers[vy as usize]);
+        if x_pos > y_pos{
+            self.variable_registers[0xF] = 1;
+        }else{
+            self.variable_registers[0xF] = 0;
+        }
+        self.variable_registers[vx as usize] = (x_pos - y_pos).0;
+    }
 
 
     fn ins_8xye(&mut self) {}
@@ -215,40 +324,98 @@ impl Instructions for Chip8 {
     fn ins_8xy6(&mut self) {}
 
 
-    fn ins_8xy7(&mut self) {}
+    fn ins_8xy7(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        let x_pos = Wrapping(self.variable_registers[vx as usize]);
+        let y_pos = Wrapping(self.variable_registers[vy as usize]);
+        if x_pos < y_pos{
+            self.variable_registers[0xF] = 1;
+        }else{
+            self.variable_registers[0xF] = 0;
+        }
+        self.variable_registers[vx as usize] = (y_pos - x_pos).0;
+    }
 
 
     fn ins_bnnn(&mut self) {}
 
 
-    fn ins_cxnn(&mut self) {}
+    fn ins_cxnn(&mut self) {
+        let rand_number = rand::random::<u16>();
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let data = self.opcode & 0x00FF;
+        self.variable_registers[vx as usize] = (data & rand_number) as u8;
+    }
 
 
-    fn ins_ex9e(&mut self) {}
+    fn ins_ex9e(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let key = self.variable_registers[vx as usize];
+        if self.keypad[key as usize] != 0{
+            self.program_counter = self.program_counter + 2;
+        }
+    }
 
 
-    fn ins_exa1(&mut self) {}
+    fn ins_exa1(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let key = self.variable_registers[vx as usize];
+        if self.keypad[key as usize] == 0 {
+            self.program_counter = self.program_counter + 2;
+        }
+    }
 
 
-    fn ins_fx07(&mut self) {}
+    fn ins_fx07(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        self.variable_registers[vx as usize] = self.delay_timer;
+    }
 
 
-    fn ins_fx15(&mut self) {}
+    fn ins_fx15(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        self.delay_timer = self.variable_registers[vx as usize];
+    }
 
 
-    fn ins_fx18(&mut self) {}
+    fn ins_fx18(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        self.sound_timer = self.variable_registers[vx as usize];
+    }
 
 
-    fn ins_fx1e(&mut self) {}
+    fn ins_fx1e(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        self.index_register = self.index_register + self.variable_registers[vx as usize] as u16;
+    }
 
 
-    fn ins_fx0a(&mut self) {}
+    fn ins_fx0a(&mut self) {
+        self.program_counter = self.program_counter - 2;
+    }
 
 
-    fn ins_fx29(&mut self) {}
+    fn ins_fx29(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        self.index_register = 0x050 + (self.variable_registers[vx as usize] * 5) as u16;
+    }
 
 
-    fn ins_fx33(&mut self) {}
+    fn ins_fx33(&mut self) {
+        todo!("Need to fix this lol");
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let data = self.variable_registers[vx as usize];
+        let pos = self.index_register;
+        let ones = data % 10;
+        let tens = ((data % 100) - ones) / 10;
+        let hundreds = (data - (data % 100)) / 100;
+        self.memory[pos as usize] = hundreds;
+        self.memory[(pos + 1) as usize] = tens;
+        self.memory[(pos + 2) as usize] = ones;
+        println!("{}", data);
+        println!("{}, {}, {}", hundreds, tens, ones);
+    }
 
 
     fn ins_fx55(&mut self) {}

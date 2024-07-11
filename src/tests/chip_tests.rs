@@ -44,10 +44,18 @@ mod tests {
 
     #[test]
     fn bit_test(){
-        let ins:u16 = 0x2200;
-        let new_ins = ins & 0x0FFF;
-        //print!("{:#04x} ", (ins & 0x0FFF) >> 8u8);
-        assert_eq!(0x200, new_ins)
+        let data = 0x1F;
+        let ones = data % 10;
+        let tens = ((data % 100) - ones) / 10;
+        let hundreds = (data - (data % 100)) / 100;
+        println!("{}", data);
+        println!("{}, {}, {}", hundreds, tens, ones);
+    }
+
+    #[test]
+    fn compare_test(){
+        let ins:u16 = 0xA202 & 0x0FFF;
+        println!("old: {:#04x}", -119);
     }
 
 }

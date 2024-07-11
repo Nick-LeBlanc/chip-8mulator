@@ -19,13 +19,13 @@ pub trait Instructions {
     ///Subroutine
     fn ins_00ee(&mut self) {}
 
-    ///Conditionally Skip
+    ///Conditionally Skip if Vx value == NN
     fn ins_3xnn(&mut self) {}
-    ///Conditionally Skip
+    ///Conditionally Skip if Vx value != NN
     fn ins_4xnn(&mut self) {}
-    ///Conditionally Skip
+    ///Conditionally Skip if Vx value == Vy value
     fn ins_5xy0(&mut self) {}
-    ///Conditionally Skip
+    ///Conditionally Skip if Vx value != Vy value
     fn ins_9xy0(&mut self) {}
 
     ///Set Vx to Vy

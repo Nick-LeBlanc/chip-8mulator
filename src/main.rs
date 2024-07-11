@@ -8,13 +8,13 @@ use minifb::{Key, Scale, ScaleMode, Window, WindowOptions};
 
 fn main() {
     let cycles = 8;
-    let filename = "roms/test_opcode.ch8".to_string();
+    let filename = "roms/3-corax+.ch8".to_string();
     let mut chip = Chip8::new(cycles);
     chip.load_rom(filename);
 
     let my_options = WindowOptions{
         borderless: false,
-        title: false,
+        title: true,
         resize: false,
         scale: Scale::X16,
         scale_mode: ScaleMode::Stretch,
@@ -33,7 +33,7 @@ fn main() {
         });
 
     // Limit to max ~30 fps update rate
-    window.set_target_fps(30);
+    window.set_target_fps(60);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         chip.cycle();
