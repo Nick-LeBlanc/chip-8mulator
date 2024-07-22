@@ -90,6 +90,9 @@ impl Chip8 {
             self.memory[0x200 + i] = buffer[i];
         }
     }
+    pub fn get_input(&mut self, inputs:[u8;16]){
+        self.keypad.copy_from_slice(&inputs)
+    }
 
     pub fn cycle(&mut self){
         self.opcode = (self.memory[self.program_counter as usize] as u16) << 8
@@ -105,6 +108,7 @@ impl Chip8 {
 
     fn decode(&mut self){
         let ins = self.opcode & 0xF000;
+
         match ins {
             0x0000 => {
                 let last_bit = self.opcode & 0x000F;
@@ -209,11 +213,14 @@ impl Instructions for Chip8 {
 
         for row in 0..height {
             let sprite_data = self.memory[(self.index_register+row) as usize];
+
             for col in 0..8u16{
                 let pixel_data = sprite_data & (0x80 >> col);
                 if pixel_data != 0{
-                    let i:u16 = (y_coord + row) * 64 + (x_coord + col);
-                    if self.display[i as usize] == 1 {
+
+                    let mut i:u16 = x_coord + col + ((y_coord + row) * 64);
+                    if i > self.display.len() as u16 {i = self.display.len() as u16 - 1}
+                    if self.display[i as usize] == 0xFFFFFFFF {
                         self.variable_registers[0xF] = 1;
                     }
                     self.display[i as usize] ^= 0xFFFFFFFF;
@@ -297,48 +304,62 @@ impl Instructions for Chip8 {
     fn ins_8xy4(&mut self) {
         let vx = (self.opcode & 0x0F00) >> 8u8;
         let vy= (self.opcode & 0x00F0) >> 4u8;
-        let x_pos:u16 = self.variable_registers[vx as usize] as u16;
-        let y_pos:u16 = self.variable_registers[vy as usize] as u16;
-        self.variable_registers[0xF] = if (x_pos + y_pos) > 255 {1} else {0};
-        self.variable_registers[vx as usize] = Wrapping(x_pos + y_pos).0 as u8;
+        let data = u8::overflowing_add(self.variable_registers[vx as usize],
+                                       self.variable_registers[vy as usize]);
+        self.variable_registers[vx as usize] =data.0;
+        self.variable_registers[0xF] = if data.1 {1} else {0};
     }
 
 
+    //If Vx > Vy, then VF is set to 1, otherwise 0.
+    // Then Vy is subtracted from Vx, and the results stored in Vx.
     fn ins_8xy5(&mut self) {
         let vx = (self.opcode & 0x0F00) >> 8u8;
         let vy= (self.opcode & 0x00F0) >> 4u8;
-        let x_pos = Wrapping(self.variable_registers[vx as usize]);
-        let y_pos = Wrapping(self.variable_registers[vy as usize]);
-        if x_pos > y_pos{
-            self.variable_registers[0xF] = 1;
-        }else{
-            self.variable_registers[0xF] = 0;
-        }
-        self.variable_registers[vx as usize] = (x_pos - y_pos).0;
+
+        let data = u8::overflowing_sub(self.variable_registers[vx as usize],
+                                       self.variable_registers[vy as usize]);
+
+        self.variable_registers[vx as usize] =data.0;
+        self.variable_registers[0xF] = if data.1 {0} else {1};
     }
-
-
-    fn ins_8xye(&mut self) {}
-
-
-    fn ins_8xy6(&mut self) {}
-
 
     fn ins_8xy7(&mut self) {
         let vx = (self.opcode & 0x0F00) >> 8u8;
         let vy= (self.opcode & 0x00F0) >> 4u8;
-        let x_pos = Wrapping(self.variable_registers[vx as usize]);
-        let y_pos = Wrapping(self.variable_registers[vy as usize]);
-        if x_pos < y_pos{
-            self.variable_registers[0xF] = 1;
-        }else{
-            self.variable_registers[0xF] = 0;
-        }
-        self.variable_registers[vx as usize] = (y_pos - x_pos).0;
+
+        let data = u8::overflowing_sub(self.variable_registers[vy as usize],
+                                       self.variable_registers[vx as usize]);
+
+        self.variable_registers[vx as usize] =data.0;
+        self.variable_registers[0xF] = if data.1 {0} else {1};
+    }
+
+    fn ins_8xye(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        let data = self.variable_registers[vx as usize] << 1u8;
+
+        self.variable_registers[0xF] = (self.variable_registers[vx as usize] & 0x80u8) >> 7u8;
+
+        self.variable_registers[vx as usize] =data;
     }
 
 
-    fn ins_bnnn(&mut self) {}
+    fn ins_8xy6(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        let vy= (self.opcode & 0x00F0) >> 4u8;
+        let data = self.variable_registers[vx as usize] >> 1u8;
+
+        self.variable_registers[0xF] = (self.variable_registers[vx as usize] & 0x8u8) >> 7u8;
+
+        self.variable_registers[vx as usize] =data;
+    }
+
+
+    fn ins_bnnn(&mut self) {
+        self.index_register = (self.opcode & 0x0FFF) + (self.variable_registers[0x0]) as u16
+    }
 
 
     fn ins_cxnn(&mut self) {
@@ -403,7 +424,7 @@ impl Instructions for Chip8 {
 
 
     fn ins_fx33(&mut self) {
-        todo!("Need to fix this lol");
+
         let vx = (self.opcode & 0x0F00) >> 8u8;
         let data = self.variable_registers[vx as usize];
         let pos = self.index_register;
@@ -413,14 +434,31 @@ impl Instructions for Chip8 {
         self.memory[pos as usize] = hundreds;
         self.memory[(pos + 1) as usize] = tens;
         self.memory[(pos + 2) as usize] = ones;
-        println!("{}", data);
-        println!("{}, {}, {}", hundreds, tens, ones);
     }
 
 
-    fn ins_fx55(&mut self) {}
+    fn ins_fx55(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        if vx == 0x0 {
+            self.memory[self.index_register as usize] = self.variable_registers[0x0];
+            return;
+        }else{
+            self.memory[self.index_register as usize..=(self.index_register + vx) as usize].
+                copy_from_slice(&self.variable_registers[0x0..vx as usize + 1]);
+        }
+    }
 
 
-    fn ins_fx65(&mut self) {}
+    fn ins_fx65(&mut self) {
+        let vx = (self.opcode & 0x0F00) >> 8u8;
+        if vx == 0x0 {
+            self.variable_registers[0x0] = self.memory[self.index_register as usize];
+            return;
+        }else{
+            self.variable_registers[0x0..=vx as usize]
+                .copy_from_slice(&self.memory[self.index_register as usize..(self.index_register + vx) as usize + 1]);
+        }
+
+    }
 
 }
