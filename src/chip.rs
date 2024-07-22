@@ -1,10 +1,7 @@
-use std::char::decode_utf16;
 use crate::instructions::Instructions;
-use std::env::var;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::num::Wrapping;
 use rand::prelude::*;
 
 pub struct Chip8 {
@@ -217,7 +214,6 @@ impl Instructions for Chip8 {
             for col in 0..8u16{
                 let pixel_data = sprite_data & (0x80 >> col);
                 if pixel_data != 0{
-
                     let mut i:u16 = x_coord + col + ((y_coord + row) * 64);
                     if i > self.display.len() as u16 {i = self.display.len() as u16 - 1}
                     if self.display[i as usize] == 0xFFFFFFFF {
