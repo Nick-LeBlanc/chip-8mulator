@@ -18,7 +18,7 @@ pub struct Chip8 {
 }
 
 impl Chip8 {
-    pub fn new(cycles: u16) -> Self {
+    pub fn new() -> Self {
         let mut init_chip = Chip8 {
             memory: [0x000; 4096],
             display: [0x000u32; 64 * 32],
@@ -29,23 +29,14 @@ impl Chip8 {
             sound_timer: 0x000,
             keypad:[0x000; 16],
             variable_registers: [0x000; 16],
-            opcode: 0x000,
+            opcode: 0x000
         };
         init_chip.load_font();
         return init_chip;
     }
 
-    pub fn memory(&self) -> [u8; 4096] {
-        self.memory
-    }
     pub fn display(&self) -> &[u32; 64 * 32] {
         &self.display
-    }
-    pub fn program_counter(&self) -> &u16 {
-        &self.program_counter
-    }
-    pub fn opcode(&self) -> &u16 {
-        &self.opcode
     }
 
     fn load_font(&mut self) {
@@ -333,7 +324,6 @@ impl Instructions for Chip8 {
 
     fn ins_8xye(&mut self) {
         let vx = (self.opcode & 0x0F00) >> 8u8;
-        let vy= (self.opcode & 0x00F0) >> 4u8;
         let data = self.variable_registers[vx as usize] << 1u8;
 
         self.variable_registers[0xF] = (self.variable_registers[vx as usize] & 0x80u8) >> 7u8;
@@ -344,7 +334,6 @@ impl Instructions for Chip8 {
 
     fn ins_8xy6(&mut self) {
         let vx = (self.opcode & 0x0F00) >> 8u8;
-        let vy= (self.opcode & 0x00F0) >> 4u8;
         let data = self.variable_registers[vx as usize] >> 1u8;
 
         self.variable_registers[0xF] = (self.variable_registers[vx as usize] & 0x8u8) >> 7u8;
@@ -359,7 +348,7 @@ impl Instructions for Chip8 {
 
 
     fn ins_cxnn(&mut self) {
-        let rand_number = rand::random::<u16>();
+        let rand_number = random::<u16>();
         let vx = (self.opcode & 0x0F00) >> 8u8;
         let data = self.opcode & 0x00FF;
         self.variable_registers[vx as usize] = (data & rand_number) as u8;

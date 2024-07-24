@@ -2,15 +2,18 @@ mod chip;
 mod instructions;
 mod tests;
 
+use std::env;
 use chip::Chip8;
 use instructions::Instructions;
 use minifb::{Key, Scale, ScaleMode, Window, WindowOptions};
+use std::time::SystemTime;
 
 fn main() {
-    let cycles = 8;
-    let filename = "roms/tetris.ch8".to_string();
-    let mut chip = Chip8::new(cycles);
-    chip.load_rom(filename);
+    let inputs = handle_input(env::args().collect());
+
+    let mut chip = Chip8::new();
+    chip.load_rom(inputs.0);
+    let cycles = inputs.1;
 
     let my_options = WindowOptions{
         borderless: false,
@@ -35,15 +38,23 @@ fn main() {
     // Limit to max ~30 fps update rate
     window.set_target_fps(180);
 
+    let mut prev_cycle = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        chip.cycle();
+
         chip.get_input(set_controls(&window));
 
-        // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
+        let curr_cycle = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+        let delta_time = curr_cycle - prev_cycle;
+        if delta_time > cycles{
+            chip.cycle();
+            prev_cycle = curr_cycle;
+        }
         window
             .update_with_buffer(chip.display(), 64, 32)
             .unwrap();
+
     }
 }
 fn set_controls(window: &Window) -> [u8;16]{
@@ -66,4 +77,15 @@ fn set_controls(window: &Window) -> [u8;16]{
     output[0xF] = if window.is_key_down(Key::V){1}else{0};
 
     output
+}
+
+
+fn handle_input(args:Vec<String>) -> (String, u128) {
+    if args.len() != 3 {
+        panic!("Error: Wrong number of Arguments \ncargo run <Rom> <Cycles>");
+    }
+    let cycles = args[2].parse::<u128>().unwrap_or(4);
+    let filename = args[1].to_string();
+
+    return (filename, cycles)
 }
